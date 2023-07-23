@@ -1,0 +1,10 @@
+{
+    "formatVersion": 1,
+    "mainJar": {
+        "MMC-displayname": "prcraft",
+        "MMC-hint": "local",
+        "name": "custom:prcraft:1"
+    },
+    "name": "prcraft",
+    "uid": "customjar"
+}
