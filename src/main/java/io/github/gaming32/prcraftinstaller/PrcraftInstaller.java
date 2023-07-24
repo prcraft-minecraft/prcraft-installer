@@ -166,12 +166,15 @@ public class PrcraftInstaller {
                 }
             }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(
-                null,
-                "Failed to install\n" + e,
-                "prcraft installer",
-                JOptionPane.ERROR_MESSAGE
-            );
+            if (!GraphicsEnvironment.isHeadless()) {
+                JOptionPane.showMessageDialog(
+                    null,
+                    "Failed to install\n" + e,
+                    "prcraft installer",
+                    JOptionPane.ERROR_MESSAGE
+                );
+            }
+            throw e;
         }
     }
 }
