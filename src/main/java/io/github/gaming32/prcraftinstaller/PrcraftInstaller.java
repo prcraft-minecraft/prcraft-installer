@@ -108,61 +108,70 @@ public class PrcraftInstaller {
     }
 
     public static void main(String[] args) throws IOException {
-        System.out.println("Building");
-        final Path destFile = Paths.get(args.length == 0 ? "prcraft.jar" : args[0]);
-        final Path parent = destFile.getParent();
-        if (parent != null) {
-            Files.createDirectories(destFile.getParent());
-        }
-        Files.deleteIfExists(destFile);
-        runInstaller(destFile);
-        System.out.println("Build complete!");
-        Path oneSixDestPath = null;
-        if (!GraphicsEnvironment.isHeadless()) {
-            final int result = JOptionPane.showConfirmDialog(
-                null,
-                "Build complete!\nSaved to " + destFile + "\nWould you like to generate a OneSix (MultiMC/Prism) pack?",
-                "prcraft installer",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.INFORMATION_MESSAGE
-            );
-            if (result == JOptionPane.YES_OPTION) {
-                final JFileChooser fileChooser = new JFileChooser(System.getProperty("user.dir"));
-                fileChooser.setAcceptAllFileFilterUsed(false);
-                final FileFilter extensionFilter = new FileNameExtensionFilter("OneSix pack (*.zip)", "zip");
-                fileChooser.addChoosableFileFilter(extensionFilter);
-                fileChooser.setAcceptAllFileFilterUsed(true);
-                fileChooser.showSaveDialog(null);
-                final File chosen = fileChooser.getSelectedFile();
-                if (chosen != null) {
-                    String path = chosen.toString();
-                    if (fileChooser.getFileFilter() == extensionFilter && path.indexOf('.') == -1) {
-                        path += ".zip";
-                    }
-                    oneSixDestPath = Paths.get(path);
-                }
+        try {
+            System.out.println("Building");
+            final Path destFile = Paths.get(args.length == 0 ? "prcraft.jar" : args[0]);
+            final Path parent = destFile.getParent();
+            if (parent != null) {
+                Files.createDirectories(destFile.getParent());
             }
-        } else if (args.length > 1) {
-            oneSixDestPath = Paths.get(args[1]);
-        }
-        if (oneSixDestPath != null) {
-            System.out.println("Generating OneSix pack");
-            Files.createDirectories(oneSixDestPath.getParent());
-            Files.deleteIfExists(oneSixDestPath);
-            try (FileSystem zipFs = FileSystems.newFileSystem(
-                URI.create("jar:" + oneSixDestPath.toUri()), Collections.singletonMap("create", "true"), null
-            )) {
-                generateOneSix(zipFs.getPath("/"), destFile);
-            }
-            System.out.println("Generated OneSix pack");
+            Files.deleteIfExists(destFile);
+            runInstaller(destFile);
+            System.out.println("Build complete!");
+            Path oneSixDestPath = null;
             if (!GraphicsEnvironment.isHeadless()) {
-                JOptionPane.showMessageDialog(
+                final int result = JOptionPane.showConfirmDialog(
                     null,
-                    "Generated OneSix pack at " + oneSixDestPath + "\nYou should be able to drag and drop this into MultiMC or PrismLauncher.",
+                    "Build complete!\nSaved to " + destFile + "\nWould you like to generate a OneSix (MultiMC/Prism) pack?",
                     "prcraft installer",
+                    JOptionPane.YES_NO_OPTION,
                     JOptionPane.INFORMATION_MESSAGE
                 );
+                if (result == JOptionPane.YES_OPTION) {
+                    final JFileChooser fileChooser = new JFileChooser(System.getProperty("user.dir"));
+                    fileChooser.setAcceptAllFileFilterUsed(false);
+                    final FileFilter extensionFilter = new FileNameExtensionFilter("OneSix pack (*.zip)", "zip");
+                    fileChooser.addChoosableFileFilter(extensionFilter);
+                    fileChooser.setAcceptAllFileFilterUsed(true);
+                    fileChooser.showSaveDialog(null);
+                    final File chosen = fileChooser.getSelectedFile();
+                    if (chosen != null) {
+                        String path = chosen.toString();
+                        if (fileChooser.getFileFilter() == extensionFilter && path.indexOf('.') == -1) {
+                            path += ".zip";
+                        }
+                        oneSixDestPath = Paths.get(path);
+                    }
+                }
+            } else if (args.length > 1) {
+                oneSixDestPath = Paths.get(args[1]);
             }
+            if (oneSixDestPath != null) {
+                System.out.println("Generating OneSix pack");
+                Files.createDirectories(oneSixDestPath.getParent());
+                Files.deleteIfExists(oneSixDestPath);
+                try (FileSystem zipFs = FileSystems.newFileSystem(
+                    URI.create("jar:" + oneSixDestPath.toUri()), Collections.singletonMap("create", "true"), null
+                )) {
+                    generateOneSix(zipFs.getPath("/"), destFile);
+                }
+                System.out.println("Generated OneSix pack");
+                if (!GraphicsEnvironment.isHeadless()) {
+                    JOptionPane.showMessageDialog(
+                        null,
+                        "Generated OneSix pack at " + oneSixDestPath + "\nYou should be able to drag and drop this into MultiMC or PrismLauncher.",
+                        "prcraft installer",
+                        JOptionPane.INFORMATION_MESSAGE
+                    );
+                }
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(
+                null,
+                "Failed to install\n" + e,
+                "prcraft installer",
+                JOptionPane.ERROR_MESSAGE
+            );
         }
     }
 }
