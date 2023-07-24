@@ -24,6 +24,8 @@ import java.nio.file.*;
 import java.util.Collections;
 
 public class PrcraftInstaller {
+    public static final String DATA_ROOT = "https://github.com/Gaming32/prcraft-installer-data/raw/main";
+
     public static void runInstaller(Path outputFile) throws IOException {
         final Path mappingsZipPath = Files.createTempFile("prcraft", ".zip");
         final Path unmappedClientPath = Files.createTempFile("prcraft", ".jar");
@@ -35,7 +37,7 @@ public class PrcraftInstaller {
             remapClient(mappingsZipPath, unmappedClientPath, mappedClientPath);
 
             final SeekableByteChannel patchChannel = new SeekableInMemoryByteChannel();
-            downloadFile(Channels.newOutputStream(patchChannel), "https://github.com/Gaming32/prcraft-installer-data/raw/main/prcraft-patch.zip");
+            downloadFile(Channels.newOutputStream(patchChannel), DATA_ROOT + "/prcraft-patch.zip");
             try (
                 ZipFile patch = new ZipFile(patchChannel);
                 ZipFile input = new ZipFile(mappedClientPath);
@@ -43,7 +45,7 @@ public class PrcraftInstaller {
                 BufferedReader patchList = new BufferedReader(new InputStreamReader(patch.getInputStream(patch.getEntry("META-INF/file.list"))))
             ) {
                 output.putArchiveEntry(new ZipArchiveEntry("track.txt"));
-                downloadFile(output, "https://github.com/Gaming32/prcraft-installer-data/raw/main/buildnumber");
+                downloadFile(output, DATA_ROOT + "/buildnumber");
                 output.flush();
                 output.closeArchiveEntry();
 
@@ -71,11 +73,22 @@ public class PrcraftInstaller {
         }
     }
 
+    private static byte[] downloadByteArray(String url) throws IOException {
+        try (InputStream is = new URL(url).openStream()) {
+            return IOUtils.toByteArray(is);
+        }
+    }
+
     private static void remapClient(Path mappingsZipPath, Path unmappedClientPath, Path destPath) throws IOException {
         try (FileSystem zipFs = FileSystems.newFileSystem(mappingsZipPath, null)) {
             final TinyRemapper remapper = TinyRemapper.newRemapper()
                 .withMappings(TinyUtils.createTinyMappingProvider(
                     Files.newBufferedReader(zipFs.getPath("/client.tiny")), "official", "named"
+                ))
+                .withMappings(TinyUtils.createTinyMappingProvider(
+                    new BufferedReader(new InputStreamReader(
+                        new ByteArrayInputStream(downloadByteArray(DATA_ROOT + "/extramappings.tiny"))
+                    )), "official", "named"
                 ))
                 .build();
             try (OutputConsumerPath consumer = new OutputConsumerPath.Builder(destPath).build()) {
