@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.gaming32"
-version = "1.0.2"
+version = "1.0.3"
 
 application {
     mainClass.set("io.github.gaming32.prcraftinstaller.PrcraftInstaller")
@@ -21,6 +21,7 @@ repositories {
 }
 
 dependencies {
+    api("commons-io:commons-io:2.13.0")
     api("com.nitorcreations:javaxdelta:1.5")
     api("net.fabricmc:tiny-remapper:0.8.7")
     api("org.apache.commons:commons-compress:1.23.0")
