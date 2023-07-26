@@ -43,11 +43,7 @@ public class PrcraftInstaller {
                 Channels.newOutputStream(patchChannel),
                 ARTIFACT_ROOT + '/' + latestVersion + "/prcraft-" + latestVersion + ".zip"
             );
-            runInstaller(
-                patchChannel,
-                Integer.parseInt(latestVersion.substring(latestVersion.lastIndexOf('.') + 1)),
-                unmappedClientPath, outputFile
-            );
+            runInstaller(patchChannel, latestVersion, unmappedClientPath, outputFile);
         } finally {
             Files.deleteIfExists(unmappedClientPath);
         }
@@ -62,7 +58,7 @@ public class PrcraftInstaller {
         }
     }
 
-    public static void runInstaller(SeekableByteChannel patchChannel, int buildNumber, Path vanillaJar, Path outputFile) throws IOException {
+    public static void runInstaller(SeekableByteChannel patchChannel, String version, Path vanillaJar, Path outputFile) throws IOException {
         final Path mappingsZipPath = Files.createTempFile("prcraft", ".zip");
         final Path mappedClientPath = Files.createTempFile("prcraft", ".jar");
         Files.deleteIfExists(mappedClientPath);
@@ -81,8 +77,8 @@ public class PrcraftInstaller {
                 ) {
                     output.setUseZip64(Zip64Mode.Never);
 
-                    output.putArchiveEntry(new ZipArchiveEntry("track.txt"));
-                    output.write(Integer.toString(buildNumber).getBytes(StandardCharsets.UTF_8));
+                    output.putArchiveEntry(new ZipArchiveEntry("version.txt"));
+                    output.write(version.getBytes(StandardCharsets.UTF_8));
                     output.flush();
                     output.closeArchiveEntry();
 
