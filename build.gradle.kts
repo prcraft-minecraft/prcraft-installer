@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.gaming32"
-version = "1.0.3"
+version = "1.0.4"
 
 application {
     mainClass.set("io.github.gaming32.prcraftinstaller.PrcraftInstaller")
