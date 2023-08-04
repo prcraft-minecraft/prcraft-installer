@@ -11,8 +11,8 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.apache.commons.compress.utils.SeekableInMemoryByteChannel;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.file.PathUtils;
 import org.apache.commons.io.file.SimplePathVisitor;
-import org.apache.commons.io.function.IOConsumer;
 import org.apache.commons.io.input.SequenceReader;
 import org.objectweb.asm.*;
 import org.w3c.dom.Document;
@@ -35,7 +35,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.*;
-import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 public class PrcraftInstaller {
     public static final String ARTIFACT_ROOT = "https://maven.jemnetworks.com/releases/io/github/gaming32/prcraft";
@@ -113,6 +113,10 @@ public class PrcraftInstaller {
     }
 
     private static void envStrip(Path rootPath, String targetEnv) throws IOException {
+        final Set<Path> exclusions = Files.readAllLines(rootPath.resolve("strip/" + targetEnv + ".txt"))
+            .stream()
+            .map(rootPath::resolve)
+            .collect(Collectors.toSet());
         Files.walkFileTree(rootPath, new SimplePathVisitor() {
             final Type clientAnnotation = Type.getObjectType("net/minecraft/modding/api/Side$Client");
             final Type serverAnnotation = Type.getObjectType("net/minecraft/modding/api/Side$DedicatedServer");
@@ -125,6 +129,10 @@ public class PrcraftInstaller {
 
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                if (exclusions.contains(file)) {
+                    Files.delete(file);
+                    return FileVisitResult.CONTINUE;
+                }
                 final String filename = file.getFileName().toString();
                 if (!filename.endsWith(".class") || filename.equals("package-info.class")) {
                     return FileVisitResult.CONTINUE;
@@ -154,6 +162,10 @@ public class PrcraftInstaller {
 
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                if (exclusions.contains(dir)) {
+                    PathUtils.deleteDirectory(dir);
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
                 final Path packageInfoPath = dir.resolve("package-info.class");
                 if (!Files.isRegularFile(packageInfoPath)) {
                     return FileVisitResult.CONTINUE;
@@ -184,20 +196,6 @@ public class PrcraftInstaller {
                 }
             }
         });
-    }
-
-    private static void forPathIn(Path path, IOConsumer<Path> consumer) throws IOException {
-        try (Stream<Path> stream = Files.list(path)) {
-            stream.forEach(p -> {
-                try {
-                    consumer.accept(p);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
-        } catch (UncheckedIOException e) {
-            throw e.getCause();
-        }
     }
 
     private static void downloadFile(Path dest, String url) throws IOException {
