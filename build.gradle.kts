@@ -18,6 +18,7 @@ repositories {
     maven("https://maven.fabricmc.net") {
         name = "Fabric"
     }
+    maven("https://maven.jemnetworks.com/releases")
 }
 
 dependencies {
@@ -25,6 +26,7 @@ dependencies {
     api("com.nitorcreations:javaxdelta:1.5")
     api("net.fabricmc:tiny-remapper:0.8.7")
     api("org.apache.commons:commons-compress:1.23.0")
+    api("io.github.prcraftmc:strip-lib:0.1.7")
 }
 
 tasks.jar {
