@@ -1,7 +1,6 @@
 package io.github.gaming32.prcraftinstaller;
 
 import at.spardat.xma.xdelta.JarPatcher;
-import io.github.prcraftmc.striplib.ClassStripper;
 import net.fabricmc.tinyremapper.OutputConsumerPath;
 import net.fabricmc.tinyremapper.TinyRemapper;
 import net.fabricmc.tinyremapper.TinyUtils;
@@ -11,10 +10,7 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.apache.commons.compress.utils.SeekableInMemoryByteChannel;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.file.PathUtils;
-import org.apache.commons.io.file.SimplePathVisitor;
 import org.apache.commons.io.input.SequenceReader;
-import org.objectweb.asm.*;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
@@ -32,15 +28,15 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.*;
-import java.util.stream.Collectors;
 
 public class PrcraftInstaller {
     public static final String ARTIFACT_ROOT = "https://maven.jemnetworks.com/releases/io/github/gaming32/prcraft";
 
-    public static void runInstaller(Path outputFile, String targetEnv) throws IOException {
+    public static void runInstaller(Path outputFile, String classifier) throws IOException {
         final Path unmappedClientPath = Files.createTempFile("prcraft", ".jar");
         try {
             downloadFile(unmappedClientPath, "https://launcher.mojang.com/v1/objects/4a2fac7504182a97dcbcd7560c6392d7c8139928/client.jar");
@@ -48,9 +44,10 @@ public class PrcraftInstaller {
             final SeekableByteChannel patchChannel = new SeekableInMemoryByteChannel();
             downloadFile(
                 Channels.newOutputStream(patchChannel),
-                ARTIFACT_ROOT + '/' + latestVersion + "/prcraft-" + latestVersion + ".zip"
+                ARTIFACT_ROOT + '/' + latestVersion +
+                    "/prcraft-" + latestVersion + (classifier != null ? '-' + classifier : "") + ".zip"
             );
-            runInstaller(patchChannel, latestVersion, unmappedClientPath, outputFile, targetEnv);
+            runInstaller(patchChannel, latestVersion, unmappedClientPath, outputFile);
         } finally {
             Files.deleteIfExists(unmappedClientPath);
         }
@@ -69,8 +66,7 @@ public class PrcraftInstaller {
         SeekableByteChannel patchChannel,
         String version,
         Path vanillaJar,
-        Path outputFile,
-        String targetEnv
+        Path outputFile
     ) throws IOException {
         final Path mappingsZipPath = Files.createTempFile("prcraft", ".zip");
         final Path mappedClientPath = Files.createTempFile("prcraft", ".jar");
@@ -105,99 +101,7 @@ public class PrcraftInstaller {
             Files.deleteIfExists(mappingsZipPath);
             Files.deleteIfExists(mappedClientPath);
         }
-        if (targetEnv != null) {
-            try (FileSystem fs = FileSystems.newFileSystem(outputFile, null)) {
-                envStrip(fs.getRootDirectories().iterator().next(), targetEnv);
-            }
-        }
     }
-
-    private static void envStrip(Path rootPath, String targetEnv) throws IOException {
-        final Set<Path> exclusions = Files.readAllLines(rootPath.resolve("strip/" + targetEnv + ".txt"))
-            .stream()
-            .map(rootPath::resolve)
-            .collect(Collectors.toSet());
-        Files.walkFileTree(rootPath, new SimplePathVisitor() {
-            final Type clientAnnotation = Type.getObjectType("net/minecraft/modding/api/Side$Client");
-            final Type serverAnnotation = Type.getObjectType("net/minecraft/modding/api/Side$DedicatedServer");
-            final Type thisSideAnnotation = targetEnv.equals("client") ? clientAnnotation : serverAnnotation;
-            final Type otherSideAnnotation = targetEnv.equals("client") ? serverAnnotation : clientAnnotation;
-            final ClassStripper.Builder stripperFactory = ClassStripper.builder()
-                .annotation("client", clientAnnotation, "stripLambdas")
-                .annotation("dedicated_server", serverAnnotation, "stripLambdas");
-            final Set<Path> dirsToClear = new HashSet<>();
-
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                if (exclusions.contains(file)) {
-                    Files.delete(file);
-                    return FileVisitResult.CONTINUE;
-                }
-                final String filename = file.getFileName().toString();
-                if (!filename.endsWith(".class") || filename.equals("package-info.class")) {
-                    return FileVisitResult.CONTINUE;
-                }
-                if (dirsToClear.contains(file.getParent())) {
-                    Files.delete(file);
-                    return FileVisitResult.CONTINUE;
-                }
-                final ClassReader reader = getReader(file);
-                final ClassStripper stripper = stripperFactory.build(targetEnv);
-                reader.accept(stripper, 0);
-                if (stripper.stripNothing()) {
-                    return FileVisitResult.CONTINUE;
-                }
-                if (stripper.stripEntireClass()) {
-                    Files.delete(file);
-                    return FileVisitResult.CONTINUE;
-                }
-                while (stripper.needsLambdaStripping()) {
-                    reader.accept(stripper.findLambdasToStrip(), 0);
-                }
-                final ClassWriter writer = new ClassWriter(0);
-                reader.accept(stripper.getResult().visitor(writer), 0);
-                Files.write(file, writer.toByteArray(), StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                if (exclusions.contains(dir)) {
-                    PathUtils.deleteDirectory(dir);
-                    return FileVisitResult.SKIP_SUBTREE;
-                }
-                final Path packageInfoPath = dir.resolve("package-info.class");
-                if (!Files.isRegularFile(packageInfoPath)) {
-                    return FileVisitResult.CONTINUE;
-                }
-                final Set<Type> annotations = new HashSet<>();
-                getReader(packageInfoPath).accept(new ClassVisitor(Opcodes.ASM9) {
-                    @Override
-                    public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                        annotations.add(Type.getType(descriptor));
-                        return null;
-                    }
-                }, 0);
-                if (annotations.contains(otherSideAnnotation) && !annotations.contains(thisSideAnnotation)) {
-                    dirsToClear.add(dir);
-                }
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
-                dirsToClear.remove(dir);
-                return FileVisitResult.CONTINUE;
-            }
-
-            ClassReader getReader(Path path) throws IOException {
-                try (InputStream is = Files.newInputStream(path)) {
-                    return new ClassReader(is);
-                }
-            }
-        });
-    }
-
     private static void downloadFile(Path dest, String url) throws IOException {
         try (InputStream is = new URL(url).openStream()) {
             Files.copy(is, dest, StandardCopyOption.REPLACE_EXISTING);
@@ -254,10 +158,10 @@ public class PrcraftInstaller {
         try {
             System.out.println("Building");
             final List<String> argsList = new ArrayList<>(Arrays.asList(args));
-            final String targetEnv = argsList.remove("--server") ? "dedicated_server" : null;
+            final String classifier = argsList.remove("--server") ? "server" : null;
             final Path destFile = Paths.get(
                 argsList.isEmpty()
-                    ? (targetEnv != null ? "prcraft_" + targetEnv + ".jar" : "prcraft.jar")
+                    ? (classifier != null ? "prcraft-" + classifier + ".jar" : "prcraft.jar")
                     : argsList.get(0)
             );
             final Path parent = destFile.getParent();
@@ -265,7 +169,7 @@ public class PrcraftInstaller {
                 Files.createDirectories(destFile.getParent());
             }
             Files.deleteIfExists(destFile);
-            runInstaller(destFile, targetEnv);
+            runInstaller(destFile, classifier);
             System.out.println("Build complete!");
             Path oneSixDestPath = null;
             if (!GraphicsEnvironment.isHeadless()) {
