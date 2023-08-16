@@ -35,6 +35,10 @@ tasks.jar {
     }
 }
 
+java {
+    withSourcesJar()
+}
+
 publishing {
     repositories {
         maven {
