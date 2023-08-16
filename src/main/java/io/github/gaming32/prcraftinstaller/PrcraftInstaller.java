@@ -155,6 +155,7 @@ public class PrcraftInstaller {
     }
 
     public static void main(String[] args) throws IOException {
+        final boolean noGui = args.length > 0;
         try {
             System.out.println("Building");
             final List<String> argsList = new ArrayList<>(Arrays.asList(args));
@@ -172,7 +173,7 @@ public class PrcraftInstaller {
             runInstaller(destFile, classifier);
             System.out.println("Build complete!");
             Path oneSixDestPath = null;
-            if (!GraphicsEnvironment.isHeadless()) {
+            if (!noGui && !GraphicsEnvironment.isHeadless()) {
                 final int result = JOptionPane.showConfirmDialog(
                     null,
                     "Build complete!\nSaved to " + destFile + "\nWould you like to generate a OneSix (MultiMC/Prism) pack?",
@@ -209,7 +210,7 @@ public class PrcraftInstaller {
                     generateOneSix(zipFs.getPath("/"), destFile);
                 }
                 System.out.println("Generated OneSix pack");
-                if (!GraphicsEnvironment.isHeadless()) {
+                if (!noGui && !GraphicsEnvironment.isHeadless()) {
                     JOptionPane.showMessageDialog(
                         null,
                         "Generated OneSix pack at " + oneSixDestPath + "\nYou should be able to drag and drop this into MultiMC or PrismLauncher.",
@@ -219,7 +220,7 @@ public class PrcraftInstaller {
                 }
             }
         } catch (Exception e) {
-            if (!GraphicsEnvironment.isHeadless()) {
+            if (!noGui && !GraphicsEnvironment.isHeadless()) {
                 JOptionPane.showMessageDialog(
                     null,
                     "Failed to install\n" + e,
